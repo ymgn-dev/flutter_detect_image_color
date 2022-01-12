@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:crop_your_image/crop_your_image.dart';
@@ -23,55 +24,23 @@ class CropSample extends StatefulWidget {
 
 class _CropSampleState extends State<CropSample> {
   final _cropController = CropController();
-  // final _imageDataList = <Uint8List>[];
-
   late final _imageData = widget.image.readAsBytesSync();
-
-  var _loadingImage = false;
-  var _currentImage = 0;
-  // set currentImage(int value) {
-  //   setState(() {
-  //     _currentImage = value;
-  //   });
-  //   _cropController.image = _imageDataList[_currentImage];
-  // }
 
   var _isSumbnail = false;
   var _isCropping = false;
   var _isCircleUi = false;
-  Uint8List? _croppedData;
   var _statusText = '';
 
-  // @override
-  // void initState() {
-  //   _loadAllImages();
-  //   super.initState();
-  // }
-
-  // Future<void> _loadAllImages() async {
-  //   setState(() {
-  //     _loadingImage = true;
-  //   });
-  //   // for (final assetName in _images) {
-  //   //   _imageDataList.add(await _load(assetName));
-  //   // }
-  //   setState(() {
-  //     _loadingImage = false;
-  //   });
-  // }
-
-  // Future<Uint8List> _load(String assetName) async {
-  //   final assetData = await rootBundle.load(assetName);
-  //   return assetData.buffer.asUint8List();
-  // }
+  Uint8List? _croppedData;
 
   /// 画像の平均RGB値を算出する
-  Future<void> _calcAverageRgb(Uint8List croppedData) async {
-    final image = img.decodeImage(croppedData);
+  Color _calcAverageRgb(Uint8List data) {
+    final image = img.decodeImage(data);
     final pixels = image!.getBytes();
 
     double r = 0, g = 0, b = 0;
 
+    // pixelsにはr, g, b, aが含まれているため、aを飛ばしている
     for (int i = 0; i < pixels.length; i += 4) {
       r += pixels[i];
       g += pixels[i + 1];
@@ -82,7 +51,15 @@ class _CropSampleState extends State<CropSample> {
     g /= (pixels.length / 4);
     b /= (pixels.length / 4);
 
-    print('$r, $g, $b');
+    // print('$r, $g, $b');
+
+    final hex = 'FF' +
+        r.toInt().toRadixString(16) +
+        g.toInt().toRadixString(16) +
+        b.toInt().toRadixString(16);
+
+    // print(color);
+    return Color(int.parse(hex, radix: 16));
   }
 
   @override
@@ -92,7 +69,7 @@ class _CropSampleState extends State<CropSample> {
       height: double.infinity,
       child: Center(
         child: Visibility(
-          visible: !_loadingImage && !_isCropping,
+          visible: !_isCropping,
           child: Column(
             children: [
               Expanded(
@@ -149,7 +126,20 @@ class _CropSampleState extends State<CropSample> {
                   replacement: Center(
                     child: _croppedData == null
                         ? const SizedBox.shrink()
-                        : Image.memory(_croppedData!),
+                        : Column(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 64.0,
+                                decoration: BoxDecoration(
+                                  color: _calcAverageRgb(_croppedData!),
+                                ),
+                                child: const Text('切り取り領域の平均カラー'),
+                              ), //
+                              const SizedBox(height: 16.0),
+                              Image.memory(_croppedData!),
+                            ],
+                          ),
                   ),
                 ),
               ),

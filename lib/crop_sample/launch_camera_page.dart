@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_detect_image_color/crop_sample/crop_sample.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,15 +26,20 @@ class LaunchCameraPage extends HookWidget {
   Future<void> _getImageFromCamera() async {
     _startupStatus.add(StartupState.busy);
 
-    final pickedFile = await _imagePicker.pickImage(source: ImageSource.camera);
+    try {
+      final pickedFile =
+          await _imagePicker.pickImage(source: ImageSource.camera);
 
-    if (pickedFile == null) {
+      if (pickedFile == null) {
+        _startupStatus.add(StartupState.error);
+        return;
+      }
+
+      _image = File(pickedFile.path);
+      _startupStatus.add(StartupState.success);
+    } on PlatformException catch (e) {
       _startupStatus.add(StartupState.error);
-      return;
     }
-
-    _image = File(pickedFile.path);
-    _startupStatus.add(StartupState.success);
   }
 
   @override
