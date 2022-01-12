@@ -33,8 +33,15 @@ class _CropSampleState extends State<CropSample> {
 
   Uint8List? _croppedData;
 
+  // 各カラーである確率
+  double probRed = 0.0;
+  double probYellow = 0.0;
+  double probGreen = 0.0;
+  double probBlue = 0.0;
+  double probPurple = 0.0;
+
   /// 画像の平均RGB値を算出する
-  Color _calcAverageRgb(Uint8List data) {
+  Future<Color> _calcAverageRgb(Uint8List data) async {
     final image = img.decodeImage(data);
     final pixels = image!.getBytes();
 
@@ -58,7 +65,53 @@ class _CropSampleState extends State<CropSample> {
         g.toInt().toRadixString(16) +
         b.toInt().toRadixString(16);
 
-    // print(color);
+    // 色同士の距離を算出する関数
+    // 3次元の距離
+    double _calcColorDist(Color lhs, Color rhs) {
+      return ((lhs.red - rhs.red) *
+              (lhs.green * rhs.green) *
+              (lhs.blue * rhs.blue) /
+              100000)
+          .abs();
+    }
+
+    // 数値の逆数を算出する関数
+    double reciprocal(double d) => 1 / d;
+
+    final averageColor = Color(int.parse(hex, radix: 16));
+    const red = Colors.red;
+    const yellow = Colors.yellow;
+    const green = Colors.green;
+    const blue = Colors.blue;
+    const purple = Colors.purple;
+
+    final dRed = _calcColorDist(averageColor, red);
+    final dYellow = _calcColorDist(averageColor, yellow);
+    final dGreen = _calcColorDist(averageColor, green);
+    final dBlue = _calcColorDist(averageColor, blue);
+    final dPurple = _calcColorDist(averageColor, purple);
+
+    final rRed = reciprocal(dRed);
+    final rYellow = reciprocal(dYellow);
+    final rGreen = reciprocal(dGreen);
+    final rBlue = reciprocal(dGreen);
+    final rPurple = reciprocal(dPurple);
+
+    final sum = rRed + rYellow + rGreen + rBlue + rPurple;
+
+    probRed = rRed / sum * 100;
+    probYellow = rYellow / sum * 100;
+    probGreen = rGreen / sum * 100;
+    probBlue = rBlue / sum * 100;
+    probPurple = rPurple / sum * 100;
+
+    print('カラー: (r: $r, g: $g, b: $b)');
+    print('赤の確率: $probRed');
+    print('黄の確率: $probYellow');
+    print('緑の確率: $probGreen');
+    print('青の確率: $probBlue');
+    print('紫の確率: $probPurple');
+
     return Color(int.parse(hex, radix: 16));
   }
 
@@ -126,20 +179,89 @@ class _CropSampleState extends State<CropSample> {
                   replacement: Center(
                     child: _croppedData == null
                         ? const SizedBox.shrink()
-                        : Column(
-                            children: [
-                              Container(
-                                width: double.infinity,
-                                height: 64.0,
-                                decoration: BoxDecoration(
-                                  color: _calcAverageRgb(_croppedData!),
-                                ),
-                                child: const Text('切り取り領域の平均カラー'),
-                              ), //
-                              const SizedBox(height: 16.0),
-                              Image.memory(_croppedData!),
-                            ],
-                          ),
+                        : FutureBuilder(
+                            future: _calcAverageRgb(_croppedData!),
+                            builder: (context, AsyncSnapshot<Color> snapshot) {
+                              if (snapshot.connectionState ==
+                                      ConnectionState.waiting ||
+                                  snapshot.hasError) {
+                                return const Center(
+                                  child: CircularProgressIndicator.adaptive(),
+                                );
+                              }
+
+                              final color = snapshot.data!;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('切り取り領域の平均カラー'),
+                                  Container(
+                                    width: double.infinity,
+                                    height: 64.0,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                    ),
+                                    child: Text(
+                                      '(R, G, B): ${color.red}, ${color.green}, ${color.blue}',
+                                    ),
+                                  ), //
+                                  const SizedBox(height: 16.0),
+                                  const Text('↓カラーごとの推定値'),
+                                  Container(
+                                    width: MediaQuery.of(context).size.width *
+                                        probRed /
+                                        100,
+                                    height: 32.0,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4.0),
+                                  Container(
+                                    width: MediaQuery.of(context).size.width *
+                                        probYellow /
+                                        100,
+                                    height: 32.0,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.yellow,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4.0),
+                                  Container(
+                                    width: MediaQuery.of(context).size.width *
+                                        probGreen /
+                                        100,
+                                    height: 32.0,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4.0),
+                                  Container(
+                                    width: MediaQuery.of(context).size.width *
+                                        probBlue /
+                                        100,
+                                    height: 32.0,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4.0),
+                                  Container(
+                                    width: MediaQuery.of(context).size.width *
+                                        probPurple /
+                                        100,
+                                    height: 32.0,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.purple,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4.0),
+                                  Expanded(child: Image.memory(_croppedData!)),
+                                ],
+                              );
+                            }),
                   ),
                 ),
               ),
